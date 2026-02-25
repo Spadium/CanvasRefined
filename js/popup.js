@@ -748,6 +748,19 @@ function setup() {
         document.querySelector("#customBackgroundLink").value = "";
 		sendFromPopup("updateBackground");
     });
+
+    document.getElementById("fontsDropdown").addEventListener("click", (e) => {
+        const el = document.getElementById("quick-fonts");
+        const el2 = document.getElementsByClassName("custom-font")[0];
+        if (el.style.display === "none") {
+            el.style.display = "flex";
+            el2.style.display = "block";
+        } else {
+            el.style.display = "none";
+            el2.style.display = "none";
+        }
+    });
+
 }
 
 function applyGPAPreset(bounds) {
