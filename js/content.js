@@ -3,6 +3,8 @@ const current_page = window.location.pathname;
 let assignments = null;
 let grades = null;
 let announcements = [];
+let completed = [];
+let assignmentsDue = [];
 let options = {};
 let timeCheck = null;
 let reminderCheck = null;
@@ -706,22 +708,22 @@ async function getCards(api = null) {
 Better todo list
 */
 
-function setAssignmentState(id, updates) {
-    let states = options.assignment_states;
-    let length = JSON.stringify(states).length;
-    // remove the oldest states if the size is approaching the storage limit
-    if (length > 7400) {
-        let keys = Object.keys(states).sort((a, b) => states[b].expire - states[a].expire);
-        keys.splice(-5);
-        let newStates = {};
-        keys.forEach(key => {
-            newStates[key] = states[key];
-        });
-        states = newStates;
-    }
-    states[id] = states[id] ? { ...states[id], ...updates } : updates;
-    chrome.storage.sync.set({ assignment_states: states }).then(() => { cardAssignments = preloadAssignmentEls(); loadBetterTodo(); loadCardAssignments(); });
-}
+// function setAssignmentState(id, updates) {
+//     let states = options.assignment_states;
+//     let length = JSON.stringify(states).length;
+//     // remove the oldest states if the size is approaching the storage limit
+//     if (length > 7400) {
+//         let keys = Object.keys(states).sort((a, b) => states[b].expire - states[a].expire);
+//         keys.splice(-5);
+//         let newStates = {};
+//         keys.forEach(key => {
+//             newStates[key] = states[key];
+//         });
+//         states = newStates;
+//     }
+//     states[id] = states[id] ? { ...states[id], ...updates } : updates;
+//     chrome.storage.sync.set({ assignment_states: states }).then(() => { cardAssignments = preloadAssignmentEls(); loadBetterTodo(); loadCardAssignments(); });
+// }
 
 function createTodoCreateBtn(location) {
     let confirmButton = makeElement("button", location, { "className": "bettercanvas-custom-btn", "textContent": "Create" });
@@ -782,68 +784,149 @@ function createTodoCreateBtn(location) {
     });
 }
 
-function createTodoHeader(location) {
-    let todoHeader = makeElement("h2", location, { "className": "todo-list-header", "style": "display: flex; align-items:center; justify-content:space-between;" });
-    //todoHeader.style = "display: flex; align-items:center; justify-content:space-between;";
-    if (!options.custom_cards || Object.keys(options.custom_cards).length === 0) return;
-    let addFillout = makeElement("div", location, { "className": "bettercanvas-add-assignment" });
-    let now = new Date();
-    let year = now.getFullYear();
-    let month = now.getMonth() + 1;
-    let day = now.getDate();
-    month = month < 10 ? "0" + month : month;
-    day = day < 10 ? "0" + day : day;
-    addFillout.innerHTML = '<input type="text" placeholder="Name" id="bettercanvas-custom-name" class="bettercanvas-custom-input"></input><select id="bettercanvas-custom-course" class="bettercanvas-custom-input"><option value="" disabled selected>Select course</option></select><div style="display: flex;gap:5px"><input type="date" id="bettercanvas-custom-date"  class="bettercanvas-custom-input"></input><input type="time" id="bettercanvas-custom-time"  class="bettercanvas-custom-input" value="23:59"></input></div>';
-    addFillout.querySelector("#bettercanvas-custom-date").value = year + "-" + month + "-" + day;
-    let selectCourse = document.querySelector("#bettercanvas-custom-course");
-    Object.keys(options.custom_cards).forEach(id => {
-        let card = options.custom_cards[id];
-        let courseName = makeElement("option", selectCourse, { "className": "bettercanvas-select-course-option", "textContent": card.default });
-        courseName.value = id;
-    });
+// better todo html layer 1
+// function createTodoHeader(location) {
+//     let todoHeader = makeElement("h2", location, { "className": "todo-list-header", "style": "display: flex; align-items:center; justify-content:space-between;" });
+//     //todoHeader.style = "display: flex; align-items:center; justify-content:space-between;";
+//     if (!options.custom_cards || Object.keys(options.custom_cards).length === 0) return;
+//     let addFillout = makeElement("div", location, { "className": "bettercanvas-add-assignment" });
+//     let now = new Date();
+//     let year = now.getFullYear();
+//     let month = now.getMonth() + 1;
+//     let day = now.getDate();
+//     month = month < 10 ? "0" + month : month;
+//     day = day < 10 ? "0" + day : day;
+//     addFillout.innerHTML = '<input type="text" placeholder="Name" id="bettercanvas-custom-name" class="bettercanvas-custom-input"></input><select id="bettercanvas-custom-course" class="bettercanvas-custom-input"><option value="" disabled selected>Select course</option></select><div style="display: flex;gap:5px"><input type="date" id="bettercanvas-custom-date"  class="bettercanvas-custom-input"></input><input type="time" id="bettercanvas-custom-time"  class="bettercanvas-custom-input" value="23:59"></input></div>';
+//     addFillout.querySelector("#bettercanvas-custom-date").value = year + "-" + month + "-" + day;
+//     let selectCourse = document.querySelector("#bettercanvas-custom-course");
+//     Object.keys(options.custom_cards).forEach(id => {
+//         let card = options.custom_cards[id];
+//         let courseName = makeElement("option", selectCourse, { "className": "bettercanvas-select-course-option", "textContent": card.default });
+//         courseName.value = id;
+//     });
 
-    createTodoCreateBtn(addFillout);
-    let headerText = makeElement("span", todoHeader, { "className": "bettercanvas-todo-header", "textContent": "To Do" });
-    let addButton = makeElement("button", todoHeader, { "className": "bettercanvas-custom-btn", "textContent": "+ Add" });
-    addButton.addEventListener("click", () => {
-        addFillout.classList.toggle("bettercanvas-custom-open");
-    });
+//     createTodoCreateBtn(addFillout);
+//     let headerText = makeElement("span", todoHeader, { "className": "bettercanvas-todo-header", "textContent": "To Do" });
+//     let addButton = makeElement("button", todoHeader, { "className": "bettercanvas-custom-btn", "textContent": "+ Add" });
+//     addButton.addEventListener("click", () => {
+//         addFillout.classList.toggle("bettercanvas-custom-open");
+//     });
 
-    headerText.addEventListener("click", () => {
-        if (filter === "todo") {
-            filter = "done";
-            headerText.textContent = "Done";
-        } else {
-            filter = "todo";
-            headerText.textContent = "To Do";
-        }
-        moreAssignmentCount = 0;
-        moreAnnouncementCount = 0;
-        loadBetterTodo();
-    });
+//     headerText.addEventListener("click", () => {
+//         if (filter === "todo") {
+//             filter = "done";
+//             headerText.textContent = "Done";
+//         } else {
+//             filter = "todo";
+//             headerText.textContent = "To Do";
+//         }
+//         moreAssignmentCount = 0;
+//         moreAnnouncementCount = 0;
+//         loadBetterTodo();
+//     });
+// }
+
+function convertToDueDate(dueAt) {
+	// "2026-04-13T15:30:00Z" to Apr 4 at 3:30 PM
+	final = "due "
+	let date = new Date(dueAt);
+	final += date.toLocaleString("en-US", { month: "short", day: "numeric" });
+	final += " at " + date.toLocaleString("en-US", { hour: "numeric", minute: "numeric", hour12: true });
+	return final;
 }
+// better todo html
+betterTodoFilter = "tasks"
+async function createTodoSections(location) {
+	// make outer
+	let filterControl = makeElement("div", location, { "id": "better-todo-filter" });
+	filterControl.innerHTML =
+		`<div id="filterbuttongroup" style="color:black">
+			<button id="announcement">announcement</button>
+			<button id="assignments">assignments</button>
+			<button id="completed">completed</button>
+		</div>`;
+	let header = makeElement("div", location, { id: "better-todo-header" });
+	header.style =
+		"display: flex; align-items:center; justify-content:space-between;";
+	header.innerHTML = "<h2>Tasks</h2><h2>Wed Apr 8</h2>";
+	let mainSection = makeElement("div", location, {
+		id: "better-todo-main",
+	});
+	mainSection.style = "display:flex;flex-direction:column;gap:10px;margin-top:10px;";
+	assignments.then(data => {
+		// types: announcement
+		console.log(data);
+		data.forEach(item => {
+			announcements = data.filter(item => item.plannable_type == "announcement");
+			// announcements.sort((a, b) => new Date(a.plannable_date) - new Date(b.plannable_date));
+			assignmentsDue = data.filter((item) => item.plannable_type == "assignment" && !item.submissions.submitted);
+			// assignmentsDue.sort((a, b) => new Date(a.plannable_date) - new Date(b.plannable_date));
+			completed = data.filter(item => item.plannable_type == "assignment" && item.submissions.submitted);
+			// completed.sort((a, b) => new Date(a.plannable_date) - new Date(b.plannable_date));
+		});
 
-function createTodoSections(location) {
-    let todoHeader = createTodoHeader(location);
+		if (betterTodoFilter == "tasks") {
+			assignmentsDue.forEach((item) => {
+				const courseColor =
+					options.custom_cards_3?.[String(item.course_id)]?.color ??
+					options.custom_cards_3?.[item.course_id]?.color ??
+					options.custom_cards_3?.[item.plannable.course_id]?.color ??
+					"#cccccc";
 
-    let todoAssignments = makeElement("ul", location, { "id": "bettercanvas-todo-list" });
-    /*
-    let todoAssignments = document.createElement("ul");
-    todoAssignments.id = "bettercanvas-todo-list";
-    location.appendChild(todoAssignments);
-    */
-    let announcementHeader = makeElement("h2", location, { "className": "todo-list-header", "textContent": "Announcements" });
-    let todoAnnouncements = makeElement("ul", location, { "id": "bettercanvas-announcement-list" });
-    /*
-    let todoAnnouncements = document.createElement("ul");
-    todoAnnouncements.id = "bettercanvas-announcement-list";
-    location.appendChild(todoAnnouncements);
-    */
-    let loader = '<div class="bettercanvas-todo-item-loader"><div style="width: 100px" class="bettercanvas-skeleton-text"></div><div style="width: 200px" class="bettercanvas-skeleton-text"></div><div class="bettercanvas-skeleton-text"></div></div>';
-    for (let i = 0; i < options.num_todo_items; i++) {
-        todoAssignments.innerHTML += loader;
-        todoAnnouncements.innerHTML += loader;
-    }
+				let assignment = makeElement("div", mainSection, {
+					class: "better-todo-assignment",
+				});
+				// assignment.innerHTML = `
+				// <div style="width:10px;height:10px;background-color:${courseColor}">${courseColor}</div>
+				// <a href="${domain + item.html_url}">${item.plannable.title}</a>\
+				// <span>${new Date(item.plannable_date).toLocaleString()}</span>
+				// `;
+				assignment.innerHTML = `
+				<div style="display:flex;align-items:center;gap:5px;width:100%;height:60px;background:var(--bcbackground-1);border-radius:5px;">
+					<div style="width:40px;display:flex;align-items:center;justify-content:center;background-color:${courseColor};height:100%;border-radius:5px 0 0 5px;">
+						<div style="width:20px;height:20px;">
+							<svg fill="#ffffff" viewBox="0 0 1920 1920" xmlns="http://www.w3.org/2000/svg" stroke="#ffffff">
+								<g id="SVGRepo_bgCarrier" stroke-width="1"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+								<g id="SVGRepo_iconCarrier">
+									<path d="M1468.214 0v551.145L840.27 1179.089c-31.623 31.623-49.693 74.54-49.693 119.715v395.289h395.288c45.176 0 88.093-18.07 119.716-49.694l162.633-162.633v438.206H0V0h1468.214Zm129.428 581.3c22.137-22.136 57.825-22.136 79.962 0l225.879 225.879c22.023 22.023 22.023 57.712 0 79.848l-677.638 677.637c-10.616 10.503-24.96 16.49-39.98 16.49H903.516v-282.35c0-15.02 5.986-29.364 16.49-39.867Zm-920.005 548.095H338.82v112.94h338.818v-112.94Zm225.88-225.879H338.818v112.94h564.697v-112.94Zm734.106-202.5-89.561 89.56 146.03 146.031 89.562-89.56-146.031-146.031Zm-508.228-362.197H338.82v338.818h790.576V338.82Z" fill-rule="evenodd"></path>
+								</g></svg>
+						</div>
+					</div>
+					<div style="width:calc(100% - 40px);height:80%;display:flex;flex-direction:column;gap:5px;padding-left:2px;box-sizing:border-box;overflow:hidden;">
+						<div style="display:flex;flex-direction:column;gap:3px;">
+							<span style="color:${courseColor};font-size:12px;margin-top:-2px;">${item.context_name}</span>
+							<a href="${domain + item.html_url}" style="color:inherit;text-decoration:none;font-weight:bold;text-overflow:ellipsis;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:-5px;">${item.plannable.title}</a>
+							<span style="color:gray;font-size:12px;margin-top:-5px;">${convertToDueDate(item.plannable.due_at)}</span>
+						</div>
+
+					</div>
+
+				</div>
+				`;
+			});
+		}
+	})
+
+    // let todoHeader = createTodoHeader(location);
+
+    // let todoAssignments = makeElement("ul", location, { "id": "bettercanvas-todo-list" });
+    // /*
+    // let todoAssignments = document.createElement("ul");
+    // todoAssignments.id = "bettercanvas-todo-list";
+    // location.appendChild(todoAssignments);
+    // */
+    // let announcementHeader = makeElement("h2", location, { "className": "todo-list-header", "textContent": "Announcements" });
+    // let todoAnnouncements = makeElement("ul", location, { "id": "bettercanvas-announcement-list" });
+    // /*
+    // let todoAnnouncements = document.createElement("ul");
+    // todoAnnouncements.id = "bettercanvas-announcement-list";
+    // location.appendChild(todoAnnouncements);
+    // */
+    // let loader = '<div class="bettercanvas-todo-item-loader"><div style="width: 100px" class="bettercanvas-skeleton-text"></div><div style="width: 200px" class="bettercanvas-skeleton-text"></div><div class="bettercanvas-skeleton-text"></div></div>';
+    // for (let i = 0; i < options.num_todo_items; i++) {
+    //     todoAssignments.innerHTML += loader;
+    //     todoAnnouncements.innerHTML += loader;
+    // }
 }
 
 function createTodoViewMore(location, type) {
@@ -860,6 +943,7 @@ function createTodoViewMore(location, type) {
     });
 }
 
+// better todo init
 function setupBetterTodo() {
     if (options.better_todo !== true) return;
     if (document.querySelector('#bettercanvas-todo-list')) return;
