@@ -451,7 +451,7 @@ function checkDashboardReady() {
                 } else if (mutation.target == document.querySelector('#right-side')) {
                     if (!mutation.target.querySelector(".bettercanvas-todosidebar")) {
                         setupBetterTodo();
-                        loadBetterTodo();
+                        // loadBetterTodo();
                     }
                 }
             }
@@ -827,106 +827,215 @@ function createTodoCreateBtn(location) {
 // }
 
 function convertToDueDate(dueAt) {
-	// "2026-04-13T15:30:00Z" to Apr 4 at 3:30 PM
-	final = "due "
+	final = "due ";
 	let date = new Date(dueAt);
 	final += date.toLocaleString("en-US", { month: "short", day: "numeric" });
 	final += " at " + date.toLocaleString("en-US", { hour: "numeric", minute: "numeric", hour12: true });
 	return final;
 }
 // better todo html
-betterTodoFilter = "tasks"
+betterTodoFilter = "tasks";
+let domContainers = {};
 async function createTodoSections(location) {
-	// make outer
-	let filterControl = makeElement("div", location, { "id": "better-todo-filter" });
-	filterControl.innerHTML =
-		`<div id="filterbuttongroup" style="color:black">
-			<button id="announcement">announcement</button>
-			<button id="assignments">assignments</button>
-			<button id="completed">completed</button>
-		</div>`;
-	let header = makeElement("div", location, { id: "better-todo-header" });
-	header.style =
-		"display: flex; align-items:center; justify-content:space-between;";
-	header.innerHTML = "<h2>Tasks</h2><h2>Wed Apr 8</h2>";
-	let mainSection = makeElement("div", location, {
-		id: "better-todo-main",
-	});
-	mainSection.style = "display:flex;flex-direction:column;gap:10px;margin-top:10px;";
+	if (!location.querySelector("#better-todo-header")) {
+		let header = makeElement("div", location, { id: "better-todo-header" });
+		header.style = "display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bcbackground-1);padding-bottom:-2px;";
+		let today = new Date();
+		today.setHours(0,0,0,0);
+		const todayString = today.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+		header.innerHTML = `
+			<h2 style="border:none !important;padding: 0">Tasks</h2>
+			<h2 style="border:none !important;padding: 0">${todayString}</h2>
+		`;
+
+		let filterControl = makeElement("div", location, { "id": "better-todo-filter" });
+		filterControl.innerHTML = `<div id="filterbuttongroup">
+				<button id="announcement" style="color:black !important;">announcement</button>
+				<button id="assignments" style="color:black !important;">assignments</button>
+				<button id="completed" style="color:black !important;">completed</button>
+			</div>`;
+
+		document.getElementById("announcement").addEventListener("click", () => {
+			betterTodoFilter = "announcements";
+			moreAnnouncementCount = 0;
+			clearTodoList();
+			createTodoSections(location);
+		});
+		document.getElementById("assignments").addEventListener("click", () => {
+			betterTodoFilter = "tasks";
+			moreAssignmentCount = 0;
+			clearTodoList();
+			createTodoSections(location);
+		});
+		document.getElementById("completed").addEventListener("click", () => {
+			betterTodoFilter = "completed";
+			moreCompletedCount = 0;
+			clearTodoList();
+			createTodoSections(location);
+		});
+
+		let mainSection = makeElement("div", location, {
+			id: "better-todo-main",
+		});
+		mainSection.style = "display:flex;flex-direction:column;gap:10px;";
+	}
+	let mainSection = location.querySelector("#better-todo-main");
 	assignments.then(data => {
-		// types: announcement
 		console.log(data);
 		data.forEach(item => {
 			announcements = data.filter(item => item.plannable_type == "announcement");
-			// announcements.sort((a, b) => new Date(a.plannable_date) - new Date(b.plannable_date));
-			assignmentsDue = data.filter((item) => item.plannable_type == "assignment" && !item.submissions.submitted);
-			// assignmentsDue.sort((a, b) => new Date(a.plannable_date) - new Date(b.plannable_date));
-			completed = data.filter(item => item.plannable_type == "assignment" && item.submissions.submitted);
-			// completed.sort((a, b) => new Date(a.plannable_date) - new Date(b.plannable_date));
+			assignmentsDue = data.filter((item) => (item.plannable_type == "assignment" || item.plannable_type == "planner_note") && !item.submissions?.submitted && !item.planner_override?.marked_complete && !item.submissions.graded);
+			completed = data.filter(item => (item.plannable_type == "assignment" || item.plannable_type == "planner_note") && (item.submissions.submitted || item.planner_override?.marked_complete || item.submissions.graded));
 		});
+		console.log(assignmentsDue);
 
+		domContainers = {};
+		const groupKeys = ["-1", "0", "1", "2", "3", "4", "5", "6", "7", "14", "21", "30", "Later"];
+		for (const key of groupKeys) {
+			let wrapper = makeElement("div", mainSection, {
+				style: "display:none;margin-top:10px;",
+				className: "better-todo-dueheader"
+			})
+			let label = "Due Later";
+			if (key == "-1") label = "Overdue";
+			else if (key == "0") label = "Due Today";
+			else if (key == "1") label = "Tommorow";
+			else if (key >= 2 && key < 7) label = "Due in " + key + " days";
+			else if (key >= 14 && key < 30) label = "Due in " + key + " months";
+			else if (key == 30) label = "Due in 1 month";
+			makeElement("div", wrapper, {
+				textContent: label,
+				style: "display:flex;flex-direction:column;gap:10px;"
+			})
+
+			let listContainer = makeElement("div", wrapper, { className: "todo-group-list" });
+			listContainer.style = "display:flex;flex-direction:column;gap:10px;margin-top:10px;";
+
+			domContainers[key] = { wrapper, listContainer };
+		}
 		if (betterTodoFilter == "tasks") {
-			assignmentsDue.forEach((item) => {
-				const courseColor =
-					options.custom_cards_3?.[String(item.course_id)]?.color ??
-					options.custom_cards_3?.[item.course_id]?.color ??
-					options.custom_cards_3?.[item.plannable.course_id]?.color ??
-					"#cccccc";
+			populateAssignments();
+		}
+	});
+}
 
-				let assignment = makeElement("div", mainSection, {
-					class: "better-todo-assignment",
-				});
-				// assignment.innerHTML = `
-				// <div style="width:10px;height:10px;background-color:${courseColor}">${courseColor}</div>
-				// <a href="${domain + item.html_url}">${item.plannable.title}</a>\
-				// <span>${new Date(item.plannable_date).toLocaleString()}</span>
-				// `;
-				assignment.innerHTML = `
-				<div style="display:flex;align-items:center;gap:5px;width:100%;height:60px;background:var(--bcbackground-1);border-radius:5px;">
-					<div style="width:40px;display:flex;align-items:center;justify-content:center;background-color:${courseColor};height:100%;border-radius:5px 0 0 5px;">
-						<div style="width:20px;height:20px;">
-							<svg fill="#ffffff" viewBox="0 0 1920 1920" xmlns="http://www.w3.org/2000/svg" stroke="#ffffff">
-								<g id="SVGRepo_bgCarrier" stroke-width="1"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
-								<g id="SVGRepo_iconCarrier">
-									<path d="M1468.214 0v551.145L840.27 1179.089c-31.623 31.623-49.693 74.54-49.693 119.715v395.289h395.288c45.176 0 88.093-18.07 119.716-49.694l162.633-162.633v438.206H0V0h1468.214Zm129.428 581.3c22.137-22.136 57.825-22.136 79.962 0l225.879 225.879c22.023 22.023 22.023 57.712 0 79.848l-677.638 677.637c-10.616 10.503-24.96 16.49-39.98 16.49H903.516v-282.35c0-15.02 5.986-29.364 16.49-39.867Zm-920.005 548.095H338.82v112.94h338.818v-112.94Zm225.88-225.879H338.818v112.94h564.697v-112.94Zm734.106-202.5-89.561 89.56 146.03 146.031 89.562-89.56-146.031-146.031Zm-508.228-362.197H338.82v338.818h790.576V338.82Z" fill-rule="evenodd"></path>
-								</g></svg>
-						</div>
-					</div>
-					<div style="width:calc(100% - 40px);height:80%;display:flex;flex-direction:column;gap:5px;padding-left:2px;box-sizing:border-box;overflow:hidden;">
-						<div style="display:flex;flex-direction:column;gap:3px;">
-							<span style="color:${courseColor};font-size:12px;margin-top:-2px;">${item.context_name}</span>
-							<a href="${domain + item.html_url}" style="color:inherit;text-decoration:none;font-weight:bold;text-overflow:ellipsis;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:-5px;">${item.plannable.title}</a>
-							<span style="color:gray;font-size:12px;margin-top:-5px;">${convertToDueDate(item.plannable.due_at)}</span>
-						</div>
+function clearTodoList() {
+	document.getElementById("better-todo-main").querySelectorAll(".todo-group-list").forEach(list => {
+		list.innerHTML = "";
+	});
+	document.querySelectorAll(".better-todo-dueheader").forEach(header => {
+		header.remove();
+	});
+}
 
-					</div>
+function populateAssignments() {
+	const today = new Date();
+	today.setHours(0,0,0,0);
 
-				</div>
-				`;
+	assignmentsDue.forEach((item) => {
+		let dueGroup = -1;
+		let dueDate = new Date(item.plannable_date);
+		dueDate.setHours(0,0,0,0);
+		const diffDays = Math.round((dueDate - today) / (1000 * 60 * 60 * 24));
+		if (diffDays < 0) {dueGroup = 0;}
+		else if (diffDays <= 1) { dueGroup = diffDays.toString(); }
+		else if (diffDays <= 7) { dueGroup = diffDays.toString(); }
+		else if (diffDays <= 14) {dueGroup = 14;}
+		else if (diffDays <= 21) {dueGroup = 21;}
+		else if (diffDays <= 30) {dueGroup = 30;}
+		else {dueGroup = "Later"};
+
+		let assignment
+		const targetContainer = domContainers[dueGroup];
+		if (targetContainer) {
+			targetContainer.wrapper.style.display = "block";
+			assignment = makeElement("div", targetContainer.listContainer, {
+				class: "better-todo-assignment",
 			});
 		}
-	})
 
-    // let todoHeader = createTodoHeader(location);
+		const courseColor =
+			options.custom_cards_3?.[String(item.course_id)]?.color ??
+			options.custom_cards_3?.[item.course_id]?.color ??
+			options.custom_cards_3?.[item.plannable.course_id]?.color ??
+			"#cccccc";
 
-    // let todoAssignments = makeElement("ul", location, { "id": "bettercanvas-todo-list" });
-    // /*
-    // let todoAssignments = document.createElement("ul");
-    // todoAssignments.id = "bettercanvas-todo-list";
-    // location.appendChild(todoAssignments);
-    // */
-    // let announcementHeader = makeElement("h2", location, { "className": "todo-list-header", "textContent": "Announcements" });
-    // let todoAnnouncements = makeElement("ul", location, { "id": "bettercanvas-announcement-list" });
-    // /*
-    // let todoAnnouncements = document.createElement("ul");
-    // todoAnnouncements.id = "bettercanvas-announcement-list";
-    // location.appendChild(todoAnnouncements);
-    // */
-    // let loader = '<div class="bettercanvas-todo-item-loader"><div style="width: 100px" class="bettercanvas-skeleton-text"></div><div style="width: 200px" class="bettercanvas-skeleton-text"></div><div class="bettercanvas-skeleton-text"></div></div>';
-    // for (let i = 0; i < options.num_todo_items; i++) {
-    //     todoAssignments.innerHTML += loader;
-    //     todoAnnouncements.innerHTML += loader;
-    // }
+		assignment.innerHTML = `
+		<div style="display:flex;align-items:center;gap:5px;width:100%;height:60px;background:var(--bcbackground-1);border-radius:5px;">
+			<div style="width:40px;display:flex;align-items:center;justify-content:center;background-color:${courseColor};height:100%;border-radius:5px 0 0 5px;">
+				<div style="width:20px;height:20px;display:flex;margin-left:5px;">
+					<svg fill="#ffffff" viewBox="0 0 1920 1920" xmlns="http://www.w3.org/2000/svg" stroke="#ffffff">
+						<g id="SVGRepo_bgCarrier" stroke-width="1"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+						<g id="SVGRepo_iconCarrier">
+							<path d="M1468.214 0v551.145L840.27 1179.089c-31.623 31.623-49.693 74.54-49.693 119.715v395.289h395.288c45.176 0 88.093-18.07 119.716-49.694l162.633-162.633v438.206H0V0h1468.214Zm129.428 581.3c22.137-22.136 57.825-22.136 79.962 0l225.879 225.879c22.023 22.023 22.023 57.712 0 79.848l-677.638 677.637c-10.616 10.503-24.96 16.49-39.98 16.49H903.516v-282.35c0-15.02 5.986-29.364 16.49-39.867Zm-920.005 548.095H338.82v112.94h338.818v-112.94Zm225.88-225.879H338.818v112.94h564.697v-112.94Zm734.106-202.5-89.561 89.56 146.03 146.031 89.562-89.56-146.031-146.031Zm-508.228-362.197H338.82v338.818h790.576V338.82Z" fill-rule="evenodd"></path>
+						</g></svg>
+				</div>
+			</div>
+			<div style="width:calc(100% - 40px);height:80%;display:flex;flex-direction:column;gap:5px;padding-left:2px;box-sizing:border-box;overflow:hidden;">
+				<div style="display:flex;flex-direction:column;gap:3px;">
+					<span style="color:${courseColor};font-size:12px;margin-top:-2px;">${item.context_name}</span>
+					<a href="${domain + item.html_url}" style="color:inherit;text-decoration:none;font-weight:bold;text-overflow:ellipsis;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:-5px;">${item.plannable.title}</a>
+					<span style="color:gray;font-size:12px;margin-top:-5px;">${convertToDueDate(item.plannable_date)}</span>
+				</div>
+			</div>
+		</div>
+		`;
+	});
+}
+
+function populateAnnouncements() {
+	const today = new Date();
+	today.setHours(0,0,0,0);
+
+	announcementsDue.forEach((item) => {
+		let dueGroup = -1;
+		let dueDate = new Date(item.plannable_date);
+		dueDate.setHours(0,0,0,0);
+		const diffDays = Math.round((dueDate - today) / (1000 * 60 * 60 * 24));
+		if (diffDays < 0) {dueGroup = 0;}
+		else if (diffDays <= 1) { dueGroup = diffDays.toString(); }
+		else if (diffDays <= 7) { dueGroup = diffDays.toString(); }
+		else if (diffDays <= 14) {dueGroup = 14;}
+		else if (diffDays <= 21) {dueGroup = 21;}
+		else if (diffDays <= 30) {dueGroup = 30;}
+		else {dueGroup = "Later"};
+
+		let announcement;
+		const targetContainer = domContainers[dueGroup];
+		if (targetContainer) {
+			targetContainer.wrapper.style.display = "block";
+			announcement = makeElement("div", targetContainer.listContainer, {
+				class: "better-todo-announcement",
+			});
+		}
+
+		const courseColor =
+			options.custom_cards_3?.[String(item.course_id)]?.color ??
+			options.custom_cards_3?.[item.course_id]?.color ??
+			options.custom_cards_3?.[item.plannable.course_id]?.color ??
+			"#cccccc";
+
+		announcement.innerHTML = `
+		<div style="display:flex;align-items:center;gap:5px;width:100%;height:60px;background:var(--bcbackground-1);border-radius:5px;">
+			<div style="width:40px;display:flex;align-items:center;justify-content:center;background-color:${courseColor};height:100%;border-radius:5px 0 0 5px;">
+				<div style="width:20px;height:20px;display:flex;margin-left:5px;">
+					<svg fill="#ffffff" viewBox="0 0 1920 1920" xmlns="http://www.w3.org/2000/svg" stroke="#ffffff">
+						<g id="SVGRepo_bgCarrier" stroke-width="1"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+						<g id="SVGRepo_iconCarrier">
+							<path d="M1468.214 0v551.145L840.27 1179.089c-31.623 31.623-49.693 74.54-49.693 119.715v395.289h395.288c45.176 0 88.093-18.07 119.716-49.694l162.633-162.633v438.206H0V0h1468.214Zm129.428 581.3c22.137-22.136 57.825-22.136 79.962 0l225.879 225.879c22.023 22.023 22.023 57.712 0 79.848l-677.638 677.637c-10.616 10.503-24.96 16.49-39.98 16.49H903.516v-282.35c0-15.02 5.986-29.364 16.49-39.867Zm-920.005 548.095H338.82v112.94h338.818v-112.94Zm225.88-225.879H338.818v112.94h564.697v-112.94Zm734.106-202.5-89.561 89.56 146.03 146.031 89.562-89.56-146.031-146.031Zm-508.228-362.197H338.82v338.818h790.576V338.82Z" fill-rule="evenodd"></path>
+						</g></svg>
+				</div>
+			</div>
+			<div style="width:calc(100% - 40px);height:80%;display:flex;flex-direction:column;gap:5px;padding-left:2px;box-sizing:border-box;overflow:hidden;">
+				<div style="display:flex;flex-direction:column;gap:3px;">
+					<span style="color:${courseColor};font-size:12px;margin-top:-2px;">${item.context_name}</span>
+					<a href="${domain + item.html_url}" style="color:inherit;text-decoration:none;font-weight:bold;text-overflow:ellipsis;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:-5px;">${item.plannable.title}</a>
+					<span style="color:gray;font-size:12px;margin-top:-5px;">${convertToDueDate(item.plannable_date)}</span>
+				</div>
+			</div>
+		</div>
+		`;
+	});
 }
 
 function createTodoViewMore(location, type) {
@@ -955,7 +1064,7 @@ function setupBetterTodo() {
         const feedback = list.querySelector(".events_list.recent_feedback");
 
         list.textContent = "";
-        list = makeElement("div", list, { "className": "bettercanvas-todosidebar" });
+        list = makeElement("div", list, { "className": "bettercanvas-todosidebar","id": "bettercanvas-todo-list"});
         createTodoSections(list);
 
         if (feedback) list.append(feedback);
