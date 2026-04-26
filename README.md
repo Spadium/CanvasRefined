@@ -42,7 +42,6 @@ Better Canvas introduces improvements to the Canvas user interface:
 - Themes created by users (broken due to fork)
 - Assignments due list
 - Dashboard notes
-- Better todo list
 - Custom fonts
 - Condensed cards
 - Dashboard grades
@@ -60,11 +59,11 @@ Better Canvas introduces improvements to the Canvas user interface:
 - Searching themes (the original didn't actually impliment that)
 - Card Styles (image size, card roundness, card spacing, width, height, theme compatible)
 - Custom Background (by URL, theme compatible)
+- NEW Better todo list (todo: hover preview, cutoff, maybe fix some missing ones)
 
 ## Planned Features (by priority)
 - popup UI revamp
 - widgets (music, timer)
-- update better todo list (with hover assignment preview)
 - better sidebar
 - better notes
 - auto rotate theme + theme history + fix theme submissions
