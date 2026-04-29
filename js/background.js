@@ -40,6 +40,7 @@ chrome.runtime.onInstalled.addListener(function () {
             "better_todo": false,
             "todo_hr24": false,
 			"todo_separate_scrollbar": false,
+            "better_sidebar": true,
             "condensed_cards": false,
             "custom_cards": {},
             "custom_cards_2": {},

@@ -1,4 +1,4 @@
-const syncedSwitches = ['remind', 'tab_icons', 'hide_feedback', 'dark_mode', 'remlogo', 'full_width', 'auto_dark', 'assignments_due', 'gpa_calc', 'gradient_cards', 'disable_color_overlay', 'dashboard_grades', 'dashboard_notes', 'better_todo', 'condensed_cards'];
+const syncedSwitches = ['remind', 'tab_icons', 'hide_feedback', 'dark_mode', 'remlogo', 'full_width', 'auto_dark', 'assignments_due', 'gpa_calc', 'gradient_cards', 'disable_color_overlay', 'dashboard_grades', 'dashboard_notes', 'better_todo', 'better_sidebar', 'condensed_cards'];
 const syncedSubOptions = [
 	"todo_hide_feedback",
 	"todo_full_height",
@@ -69,6 +69,7 @@ const defaultOptions = {
         "dashboard_notes": false,
         "dashboard_notes_text": "",
         "better_todo": false,
+        "better_sidebar": true,
         "todo_hr24": false,
 		"todo_separate_scrollbar": false,
         "condensed_cards": false,

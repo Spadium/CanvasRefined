@@ -459,6 +459,7 @@ function checkDashboardReady() {
                 } else if (mutation.target == document.querySelector('#right-side')) {
                     if (!mutation.target.querySelector(".bettercanvas-todosidebar")) {
                         setupBetterTodo();
+                        setupBetterSidebar();
                         // loadBetterTodo();
                     }
                 }
@@ -1285,6 +1286,43 @@ function setupBetterTodo() {
     } catch (e) {
         logError(e);
     }
+}
+
+function setupBetterSidebar() {
+    if (!options.better_sidebar) return;
+    if (document.querySelector('#better-sidebar-container')) return;
+    let wrapper = document.querySelector("#wrapper");
+    if (!wrapper) return;
+    try {
+        document.querySelector("#header")?.remove();
+        document.querySelector(".ic-Layout-wrapper")?.style.setProperty("margin-left", "0");
+        // rebuild sidebar
+        const mainWrapper = document.querySelector(".ic-Layout-contentWrapper");
+        mainWrapper.style.display = "flex";
+
+        let sidebarList = makeElement("div", mainWrapper, { id: "better-sidebar-container", 
+            style: "display:flex;flex-direction:column;width:250px;justify-content:center;gap:20px;padding:20px;box-sizing:border-box;position:relative;background-color:red;"
+        }, true);
+        sidebarList.innerHTML = `
+            
+        `;
+        let expander = makeElement("div", sidebarList, {
+            style: "display:flex;flex-direction:column;gap:10px;position:absolute:bottom:10px;"
+        });
+        expander.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:50px;height:50px;transition:all .3s ease;cursor:pointer;">
+                <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+                <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+                <g id="SVGRepo_iconCarrier"> 
+                    <path d="M20 4V20M4 12H16M16 12L12 8M16 12L12 16" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                </g>
+            </svg>
+        `
+
+    } catch (e) {
+        logError(e);
+    }
+    
 }
 
 let delay;
@@ -2639,12 +2677,16 @@ function getApiData() {
 }
 
 
-function makeElement(element, location, options) {
+function makeElement(element, location, options, prepend = false) {
     let creation = document.createElement(element);
     Object.keys(options).forEach(key => {
         creation[key] = options[key];
     });
-    location.appendChild(creation);
+    if (prepend) {
+        location.insertBefore(creation, location.firstChild);
+    } else {
+        location.appendChild(creation);
+    }
     return creation
 }
 
