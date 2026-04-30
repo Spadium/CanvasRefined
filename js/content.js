@@ -1337,10 +1337,10 @@ function setupBetterSidebar() {
         mainWrapper.style.display = "flex";
 
         let sidebarList = makeElement("div", mainWrapper, { id: "better-sidebar-container",
-            style: "display:flex;flex-direction:column;width:150px;justify-content:center;align-items:center;box-sizing:border-box;position:relative;background-color:red;height:100vh;position:sticky;top:0;left:0;"
+            style: "display:flex;flex-direction:column;width:150px;justify-content:center;align-items:center;box-sizing:border-box;position:relative;background-color:var(--bcbackground-0);height:100vh;position:sticky;top:0;left:0;"
         }, true);
 		let sidebarContent = makeElement("div", sidebarList, {
-			style: "display:flex;flex-direction:column;gap:20px;width:100%;flex:1;justify-content:flex-start;align-items:center;background-color:blue;margin:5px;"
+			style: "display:flex;flex-direction:column;gap:20px;width:100%;flex:1;justify-content:flex-start;align-items:center;margin:40px;"
 		});
 		// sidebar contents
 		createSidebarButton("Dashboard", domain+"/", sidebarContent);
@@ -1352,24 +1352,35 @@ function setupBetterSidebar() {
 
 
         let expander = makeElement("div", sidebarList, {
-            style: "display:flex;flex-direction:column;gap:0px;margin-top:auto;"
+            style: "display:flex;flex-direction:column;gap:0px;margin-top:auto;width:100%;justify-content:center;align-items:center;"
         });
         expander.innerHTML = `
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:40px;height:40px;transition:all .3s ease;cursor:pointer;">
                 <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
                 <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
                 <g id="SVGRepo_iconCarrier">
-                    <path d="M20 4V20M4 12H16M16 12L12 8M16 12L12 16" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    <path d="M20 4V20M4 12H16M16 12L12 8M16 12L12 16" stroke="var(--bctext-0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                 </g>
             </svg>
         `
+        let expanded = false;
+        expander.addEventListener("click", () => {
+            if (expanded) {
+                sidebarList.style.width = "100px";
+                expander.style.transform = "rotate(0deg)";
+            } else {
+                sidebarList.style.width = "150px";
+                expander.style.transform = "rotate(180deg)";
+            }
+            expanded = !expanded;
+        })
     } catch (e) {
         logError(e);
     }
 }
 function createSidebarButton(text, url, parent) {
 	let button = makeElement("a", parent, {
-		style: "width:80%;height:30px;cursor:pointer;text-align:center;text-decoration:none;display:flex;justify-content:center;align-items:center;color:var(--bctext-0);font-weight:bold;",
+		style: "width:80%;height:30px;cursor:pointer;text-align:center;text-decoration:none;display:flex;justify-content:center;align-items:center;color:var(--bctext-0);font-weight:bold;background-color:var(--bcbackground-2);",
 		className: "bettercanvas-custom-btn",
 		textContent: text,
 		href: url,
