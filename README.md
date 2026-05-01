@@ -59,10 +59,10 @@ Actually Better Canvas adds more with more to come!
 - Custom Background (by URL, theme compatible)
 - Popup UI revamp
 - NEW Better todo list
+- better sidebar (beta)
 
 ## Planned Features (by priority)
 - widgets (music, timer)
-- better sidebar
 - better notes
 - auto rotate theme + theme history + fix theme submissions
 - mail assistent + ui revamp
