@@ -1,5 +1,11 @@
 const domain = window.location.origin;
 const current_page = window.location.pathname;
+
+function getCurrentCourseId() {
+    const match = current_page.match(/^\/courses\/(\d+)(?:\/|$)/);
+    return match ? parseInt(match[1]) : null;
+}
+
 let assignments = null;
 let grades = null;
 let announcements = [];
@@ -974,31 +980,37 @@ async function createTodoSections(location) {
 	}
 	let mainSection = location.querySelector("#better-todo-main");
 	assignments.then(data => {
-		// console.log(data);
-		data.forEach(item => {
-			announcements = data.filter(item => item.plannable_type == "announcement");
-			assignmentsDue = data.filter(item => (item.plannable_type == "assignment" || item.plannable_type == "planner_note") && !item.submissions?.submitted && !item.planner_override?.marked_complete);
-			completed = data.filter(item => (item.plannable_type == "assignment" || item.plannable_type == "planner_note") && (item.submissions?.submitted || item.planner_override?.marked_complete));
-		});
+        const courseId = getCurrentCourseId();
+        const scopedData = courseId
+            ? data.filter(item => {
+                const itemCourseId = parseInt(item.course_id || item.context_id || item?.plannable?.course_id);
+                return itemCourseId === courseId;
+            })
+            : data;
+
+        announcements = scopedData.filter(item => item.plannable_type == "announcement");
+        assignmentsDue = scopedData.filter(item => (item.plannable_type == "assignment" || item.plannable_type == "planner_note") && !item.submissions?.submitted && !item.planner_override?.marked_complete);
+        completed = scopedData.filter(item => (item.plannable_type == "assignment" || item.plannable_type == "planner_note") && (item.submissions?.submitted || item.planner_override?.marked_complete));
 		// console.log("assignments", assignmentsDue);
 		// console.log("announcements", announcements);
 		// console.log("completed", completed);
 
-		if (!document.getElementById("better-todo-announcement-badge")) {
-			let isAnnoucementBadge = 0;
-			announcements.forEach(item => {
-				if (item.plannable.read_state == "unread") {
-					isAnnoucementBadge++;
-					return;
-				}
-			})
-			if (isAnnoucementBadge > 0) {
-				makeElement("div", document.getElementById("better-todo-announcement"), {
-					id: "better-todo-announcement-badge",
-					style: "background-color:#ff0000;width:15px;height:15px;border-radius:50%;font-size:12px;position:absolute;top:-7px;left:16px;display:flex;justify-content:center;align-items:center;", // TODO: theme compatibility
-					innerHTML: `<span style="color:white;">${isAnnoucementBadge}</span>`
-				})
-			}
+        if (document.getElementById("better-todo-announcement-badge")) {
+            document.getElementById("better-todo-announcement-badge").remove();
+        }
+        let isAnnoucementBadge = 0;
+        announcements.forEach(item => {
+            if (item.plannable.read_state == "unread") {
+                isAnnoucementBadge++;
+                return;
+            }
+        })
+        if (isAnnoucementBadge > 0) {
+            makeElement("div", document.getElementById("better-todo-announcement"), {
+                id: "better-todo-announcement-badge",
+                style: "background-color:#ff0000;width:15px;height:15px;border-radius:50%;font-size:12px;position:absolute;top:-7px;left:16px;display:flex;justify-content:center;align-items:center;", // TODO: theme compatibility
+                innerHTML: `<span style="color:white;">${isAnnoucementBadge}</span>`
+            })
 		}
 
 		domContainers = {};
@@ -1070,6 +1082,11 @@ async function createTodoSections(location) {
 }
 
 function clearTodoList() {
+    const seeMoreBtn = document.getElementById("better-todo-see-more");
+    if (seeMoreBtn) {
+        seeMoreBtn.remove();
+    }
+
 	document.getElementById("better-todo-main").querySelectorAll(".todo-group-list").forEach(list => {
 		list.innerHTML = "";
 	});
@@ -1363,21 +1380,24 @@ function setupBetterSidebar(mode = "dash") {
 		if (mode == "course") {
 			const courseLinksContainer = makeElement("div", sidebarContent, {
 				id: "better-course-links",
-				style: "display:flex;flex-direction:column;gap:15px;width:100%;align-items:center;min-height:auto;padding:10px 0;border-top:1px solid var(--bcborder-0);"
+				style: "display:flex;flex-direction:column;gap:12px;width:calc(100% - 16px);align-items:stretch;margin:15px 8px 0;padding:12px;border-radius:8px;background:linear-gradient(135deg, rgba(var(--bc-primary-rgb), 0.08) 0%, rgba(var(--bc-primary-rgb), 0.04) 100%);border:1px solid rgba(var(--bc-primary-rgb), 0.15);"
 			});
 			
 			if (courseLinks && courseLinks.length > 0) {
-				makeElement("h1", courseLinksContainer, {
+				makeElement("div", courseLinksContainer, {
 					id: "better-course-links-title",
-					textContent: "Course Links:",
-					style: "font-size:12px;color:var(--bctext-0);margin:0;font-weight:bold;white-space:nowrap;text-align:center;display:block;"
+					textContent: "Course Pages",
+					style: "font-size:11px;color:var(--bctext-0);margin:0;font-weight:600;white-space:nowrap;text-align:center;display:block;letter-spacing:0.5px;text-transform:uppercase;opacity:0.8;"
+				})
+				makeElement("div", courseLinksContainer, {
+					style: "height:1px;background:linear-gradient(90deg, transparent, rgba(var(--bctext-0-rgb), 0.2), transparent);margin:2px 0;"
 				})
 				courseLinks.forEach((link) => {
 				createSidebarButton(
 					link.name,
 					domain + link.url,
 					courseLinksContainer,
-					`<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:20px;height:20px;">
+					`<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:18px;height:18px;">
 						<g id="SVGRepo_bgCarrier" stroke-width="0"></g>
 						<g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
 						<g id="SVGRepo_iconCarrier">
@@ -1510,11 +1530,14 @@ function updateSidebar(expanded, sidebarList, expander) {
 	const courseLinksTitle = document.getElementById("better-course-links-title");
 	if (courseLinksTitle) {
 		courseLinksTitle.style.display = expanded ? "block" : "none";
+		// Also hide separator when collapsed
+		const separator = courseLinksTitle.nextElementSibling;
+		if (separator) separator.style.display = expanded ? "block" : "none";
+		
 		const container = document.getElementById("better-course-links");
 		if (container) {
-			container.style.borderTop = expanded ? "1px solid var(--bcborder-0)" : "none";
-			container.style.paddingTop = expanded ? "10px" : "5px";
-			container.style.paddingBottom = expanded ? "0" : "5px";
+			container.style.opacity = expanded ? "1" : "0.6";
+			container.style.gap = expanded ? "12px" : "8px";
 		}
 	}
 }
