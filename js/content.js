@@ -1243,6 +1243,211 @@ function formatTimeForInput(date) {
     return `${hours}:${minutes}`;
 }
 
+function renderProgressRings(container, scopedData) {
+    const allAssignments = scopedData.filter(item => (item.plannable_type == "assignment" || item.plannable_type == "planner_note"));
+
+    // exclude items older than one month
+    const oneMonthAgo = Date.now() - 1000 * 60 * 60 * 24 * 30;
+    const recentAssignments = allAssignments.filter(item => {
+        const dateStr = item.plannable_date || item.todo_date || item.plannable?.due_at || item.plannable?.plannable_date;
+        if (!dateStr) return true; // keep items without a date
+        const ts = Date.parse(dateStr);
+        if (Number.isNaN(ts)) return true;
+        return ts >= oneMonthAgo;
+    });
+    const groups = {};
+    allAssignments.forEach(item => {
+        const cid = String(item.course_id || item.context_id || item.plannable?.course_id || "personal");
+        groups[cid] = groups[cid] || [];
+        groups[cid].push(item);
+    });
+
+    const entries = Object.keys(groups).map(cid => {
+        const arr = groups[cid];
+        const completed = arr.filter(it => (it.submissions?.submitted || it.planner_override?.marked_complete)).length;
+        return { courseId: cid, total: arr.length, completed };
+    }).filter(e => e.total > 0);
+
+    if (!entries.length) {
+        container.innerHTML = "";
+        return;
+    }
+
+    // sort by total desc and limit rings to 6
+    entries.sort((a, b) => b.total - a.total);
+    const shown = entries.slice(0, 6);
+
+    const totalAll = shown.reduce((s, e) => s + e.total, 0);
+    const completedAll = shown.reduce((s, e) => s + e.completed, 0);
+    const percent = totalAll === 0 ? 0 : Math.round((completedAll / totalAll) * 100);
+
+    // build SVG rings with visible gaps and a larger central hole.
+    // calculate available width from the container so the outer ring is slightly inset
+    const containerWidth = (container.clientWidth || 240);
+    const maxSize = Math.min(280, Math.floor(containerWidth * 0.99));
+    const size = maxSize; // svg square size
+    const cx = size / 2;
+    const cy = size / 2;
+    let svgInner = "";
+
+    const ringCount = shown.length;
+    const stroke = 8; // ring thickness (thinner)
+    const gap = 4; // visible gap between rings (reduced)
+    const decrement = stroke + gap; // radius difference per ring ensures gap
+
+    // make outer ring extend closer to container edges by using a small padding
+    const padding = 2;
+    const startRadius = Math.floor((size / 2) - padding - (stroke / 2));
+
+    // ensure radii stay positive; if too small, reduce stroke/gap
+    const minCenterRadius = 28; // minimum desired central hole radius
+    const requiredSpace = (ringCount - 1) * decrement + stroke / 2 + minCenterRadius;
+    let adjustFactor = 1;
+    if (requiredSpace > startRadius) {
+        // scale down decrement to fit
+        adjustFactor = (startRadius - minCenterRadius - stroke / 2) / Math.max(1, (ringCount - 1) * decrement);
+    }
+
+    shown.forEach((entry, idx) => {
+        const effectiveDecrement = Math.max(1, Math.floor(decrement * adjustFactor));
+        const radius = startRadius - idx * effectiveDecrement;
+        if (radius <= 0) return;
+        const circumference = 2 * Math.PI * radius;
+        const prog = entry.total === 0 ? 0 : (entry.completed / entry.total);
+        const color = options.custom_cards_3?.[String(entry.courseId)]?.color || options.custom_cards_3?.[entry.courseId]?.color || `hsl(${(idx * 60) % 360} 70% 50%)`;
+
+        // background ring (faded course color)
+        svgInner += `<circle cx='${cx}' cy='${cy}' r='${radius}' stroke='${color}' stroke-opacity='0.25' stroke-width='${stroke}' fill='none'></circle>`;
+        // progress ring (rotate -90 to start at top) - initialize empty and animate to target
+        const dasharrayVal = circumference.toFixed(3);
+        const dashoffsetTarget = (circumference * (1 - prog)).toFixed(3);
+        // start with full offset (empty) and store target in data attribute; we'll animate after inserting into DOM
+        svgInner += `<circle class='bettercanvas-progress-ring' cx='${cx}' cy='${cy}' r='${radius}' stroke='${color}' stroke-width='${stroke}' fill='none' stroke-linecap='round' transform='rotate(-90 ${cx} ${cy})' stroke-dasharray='${dasharrayVal}' stroke-dashoffset='${dasharrayVal}' data-target='${dashoffsetTarget}' style='transition: stroke-dashoffset .8s cubic-bezier(.2,.9,.2,1), opacity .3s ease;'></circle>`;
+    });
+
+    // center overlay text positioned inside the hole
+    // Reuse existing elements when possible to avoid DOM replacement flicker
+    let wrapper = container.querySelector('.bettercanvas-progress-wrapper');
+    if (!wrapper) {
+        wrapper = document.createElement('div');
+        wrapper.className = 'bettercanvas-progress-wrapper';
+        wrapper.style.display = 'flex';
+        wrapper.style.flexDirection = 'column';
+        wrapper.style.alignItems = 'center';
+        wrapper.style.position = 'relative';
+        container.appendChild(wrapper);
+    }
+
+    // svg container
+    let svg = wrapper.querySelector('svg.bettercanvas-progress-svg');
+    if (!svg) {
+        svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'bettercanvas-progress-svg');
+        svg.setAttribute('width', String(size));
+        svg.setAttribute('height', String(size));
+        svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+        svg.style.display = 'block';
+        wrapper.appendChild(svg);
+    } else {
+        svg.setAttribute('width', String(size));
+        svg.setAttribute('height', String(size));
+        svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+    }
+
+    // ensure overlay text exists
+    let overlay = wrapper.querySelector('.bettercanvas-progress-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.className = 'bettercanvas-progress-overlay';
+        overlay.style.position = 'absolute';
+        overlay.style.left = '0';
+        overlay.style.top = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.display = 'flex';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+        overlay.style.pointerEvents = 'none';
+        const textWrap = document.createElement('div');
+        textWrap.style.textAlign = 'center';
+        textWrap.style.color = 'var(--bctext-0)';
+        textWrap.innerHTML = `<div class='bettercanvas-progress-percent' style='font-weight:700;font-size:20px;line-height:1;'>${percent}%</div><div class='bettercanvas-progress-count' style='font-size:12px;margin-top:4px;'>${completedAll}/${totalAll} done</div>`;
+        overlay.appendChild(textWrap);
+        wrapper.appendChild(overlay);
+    } else {
+        const pc = overlay.querySelector('.bettercanvas-progress-percent');
+        const cnt = overlay.querySelector('.bettercanvas-progress-count');
+        if (pc) pc.textContent = `${percent}%`;
+        if (cnt) cnt.textContent = `${completedAll}/${totalAll} done`;
+    }
+
+    // Update or create rings in-place
+    const existingBg = svg.querySelectorAll('circle.bettercanvas-ring-bg');
+    const existingFg = svg.querySelectorAll('circle.bettercanvas-progress-ring');
+
+    // reuse or create circles per shown entry
+    shown.forEach((entry, idx) => {
+        const radius = startRadius - idx * Math.max(1, Math.floor(decrement * adjustFactor));
+        const circumference = 2 * Math.PI * radius;
+        const prog = entry.total === 0 ? 0 : (entry.completed / entry.total);
+        const color = options.custom_cards_3?.[String(entry.courseId)]?.color || options.custom_cards_3?.[entry.courseId]?.color || `hsl(${(idx * 60) % 360} 70% 50%)`;
+
+        // background circle
+        let bg = svg.querySelector(`circle.bettercanvas-ring-bg[data-idx='${idx}']`);
+        if (!bg) {
+            bg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            bg.classList.add('bettercanvas-ring-bg');
+            bg.setAttribute('data-idx', String(idx));
+            svg.appendChild(bg);
+        }
+        bg.setAttribute('cx', String(cx));
+        bg.setAttribute('cy', String(cy));
+        bg.setAttribute('r', String(radius));
+        bg.setAttribute('stroke', color);
+        bg.setAttribute('stroke-opacity', '0.25');
+        bg.setAttribute('stroke-width', String(stroke));
+        bg.setAttribute('fill', 'none');
+
+        // foreground (progress) circle
+        let fg = svg.querySelector(`circle.bettercanvas-progress-ring[data-idx='${idx}']`);
+        const dasharrayVal = circumference.toFixed(3);
+        const dashoffsetTarget = (circumference * (1 - prog)).toFixed(3);
+        if (!fg) {
+            fg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            fg.classList.add('bettercanvas-progress-ring');
+            fg.setAttribute('data-idx', String(idx));
+            fg.setAttribute('stroke-linecap', 'round');
+            fg.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+            fg.setAttribute('stroke-dasharray', dasharrayVal);
+            fg.setAttribute('stroke-dashoffset', dasharrayVal); // start empty
+            fg.style.transition = 'stroke-dashoffset .8s cubic-bezier(.2,.9,.2,1), opacity .3s ease';
+            svg.appendChild(fg);
+        }
+        fg.setAttribute('cx', String(cx));
+        fg.setAttribute('cy', String(cy));
+        fg.setAttribute('r', String(radius));
+        fg.setAttribute('stroke', color);
+        fg.setAttribute('stroke-width', String(stroke));
+        fg.setAttribute('fill', 'none');
+        fg.setAttribute('stroke-dasharray', dasharrayVal);
+        fg.setAttribute('data-target', dashoffsetTarget);
+
+        // request animation frame to set dashoffset to target (triggers transition)
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                fg.setAttribute('stroke-dashoffset', dashoffsetTarget);
+            });
+        });
+    });
+
+    // remove any extra existing circles
+    const maxIdx = shown.length - 1;
+    svg.querySelectorAll('circle.bettercanvas-ring-bg, circle.bettercanvas-progress-ring').forEach(c => {
+        const idx = parseInt(c.getAttribute('data-idx'));
+        if (Number.isNaN(idx) || idx > maxIdx) c.remove();
+    });
+}
+
 function buildPlannerNotePayload(form) {
     const title = form.querySelector("#better-todo-new-task-title")?.value?.trim();
     const details = form.querySelector("#better-todo-new-task-details")?.value?.trim();
@@ -1471,10 +1676,13 @@ async function createTodoSections(location) {
 		let today = new Date();
 		today.setHours(0,0,0,0);
 		const todayString = today.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
-		header.innerHTML = `
-			<h2 style="border:none !important;padding: 0">Tasks</h2>
-			<h2 style="border:none !important;padding: 0">${todayString}</h2>
-		`;
+        header.innerHTML = `
+                <h2 style="border:none !important;padding: 0">Tasks</h2>
+                <h2 style="border:none !important;padding: 0">${todayString}</h2>
+            `;
+
+        // placeholder for progress rings above the tab/filter control
+        makeElement("div", location, { id: "better-todo-progress-placeholder", style: "display:flex;justify-content:center;margin-top:8px;" });
 
 		let filterControl = makeElement("div", location, { "id": "better-todo-filter" });
 		filterControl.innerHTML = `
@@ -1601,9 +1809,9 @@ async function createTodoSections(location) {
 		}
 
 
-		if (betterTodoFilter == "tasks") {
-			populateAssignments();
-		}
+        if (betterTodoFilter == "tasks") {
+            populateAssignments();
+        }
 		if (betterTodoFilter == "announcements") {
 			populateAnnouncements();
 		}
@@ -1612,8 +1820,23 @@ async function createTodoSections(location) {
 		}
 
         const feedbackElement = location.querySelector(".recent_feedback");
-        ensureTodoTaskMenu(location, feedbackElement);
-		if (feedbackElement) {
+
+        // populate progress rings placeholder
+        const progressPlaceholder = document.getElementById("better-todo-progress-placeholder");
+        if (progressPlaceholder) {
+            renderProgressRings(progressPlaceholder, scopedData);
+        }
+
+        // Only show the Add Task control on the Assignments (tasks) tab.
+        if (betterTodoFilter === "tasks") {
+            ensureTodoTaskMenu(location, feedbackElement);
+        } else {
+            // remove the actions row if it exists when not on the assignments tab
+            const existing = location.querySelector("#better-todo-actions-row");
+            if (existing) existing.remove();
+        }
+
+        if (feedbackElement) {
 			if (options.todo_hide_feedback == true) {
 				feedbackElement.style.display = "none";
 			} else {
@@ -1893,10 +2116,37 @@ function markAs(item, element) {
 			item.planner_override.marked_complete = completeState;
 			element.style.transform = "translate(100%)";
 			element.style.opacity = "0";
-			setTimeout(() => {
-				clearTodoList();
-				createTodoSections(document.querySelector("#bettercanvas-todo-list"));
-			}, 400);
+
+        // update progress rings immediately so they animate while the item slides/fades
+        const progressPlaceholder = document.getElementById("better-todo-progress-placeholder");
+        if (progressPlaceholder && typeof assignments?.then === 'function') {
+            assignments.then(data => {
+                const courseId = getCurrentCourseId();
+                const scopedData = courseId
+                    ? data.map(d => Object.assign({}, d)) // shallow copy
+                        .filter(d => {
+                            const itemCourseId = parseInt(d.course_id || d.context_id || d?.plannable?.course_id);
+                            return itemCourseId === courseId;
+                        })
+                    : data.map(d => Object.assign({}, d));
+
+                // reflect the updated state for this item in the snapshot
+                for (let i = 0; i < scopedData.length; i++) {
+                    if (scopedData[i].plannable_id === item.plannable_id && scopedData[i].plannable_type === item.plannable_type) {
+                        scopedData[i].planner_override = scopedData[i].planner_override || {};
+                        scopedData[i].planner_override.marked_complete = item.planner_override.marked_complete;
+                        break;
+                    }
+                }
+
+                renderProgressRings(progressPlaceholder, scopedData);
+            });
+        }
+
+        setTimeout(() => {
+            clearTodoList();
+            createTodoSections(document.querySelector("#bettercanvas-todo-list"));
+        }, 400);
 		}
 	})
 	.catch(err => console.error("error marking as complete", err));
