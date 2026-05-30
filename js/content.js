@@ -516,6 +516,9 @@ function applyOptionsChanges(changes) {
 			case "custom_styles":
 				applyAestheticChanges();
 				break;
+            case "customBackgroundScale":
+                applyCustomBackground();
+                break;
 			// case "show_updates":
 			// 	showUpdateMsg();
 			// 	break;
@@ -624,10 +627,13 @@ function applyCustomBackground() {
     style.id = "canvasrefined-background";
     
     if (options.customBackgroundLink && options.customBackgroundLink !== "") {
+        const backgroundScale = Number(options.customBackgroundScale) || 100;
         style.textContent = `
         #wrapper {
             background-image: url('${options.customBackgroundLink}') !important;
-            background-size: cover !important;
+            background-size: ${backgroundScale}% auto !important;
+            background-repeat: no-repeat !important;
+            background-position: center center !important;
             background-attachment: fixed !important;
         }
         .ic-Dashboard-header__layout {
@@ -3706,43 +3712,80 @@ function setupGPACalc() {
     try {
         grades?.then(result => {
 
-            if (!document.querySelector(".ic-DashboardCard__box__container")) return;
+            const dashboardContainer = document.querySelector(".ic-DashboardCard__box__container");
+            if (!dashboardContainer) return;
 
-            let container2 = document.querySelector(".canvasrefined-gpa-card") || document.createElement("div");
-            container2.className = "canvasrefined-gpa-card";
-            container2.style.display = options.gpa_calc === true ? "inline-block" : "none";
+            let container2 = document.querySelector(".canvasrefined-gpa-card");
+            let container = document.querySelector(".canvasrefined-gpa");
+            const alreadyRendered = container2?.dataset?.canvasrefinedGpaRendered === "true" && container?.dataset?.canvasrefinedGpaRendered === "true";
 
-            container2.innerHTML = `<h3 class="canvasrefined-gpa-header">GPA</h3><div><div><p id="canvasrefined-gpa-unweighted"></p><p>Current</p></div><div style="display:${options["gpa_calc_weighted"] ? "block" : "none"}"><p id="canvasrefined-gpa-weighted"></p><p>Weighted</p></div><div style="display:${options["gpa_calc_cumulative"] ? "block" : "none"}"><p id="canvasrefined-gpa-cumulative"></p><p>Cumulative</p></div></div>`;
-            let editBtn = makeElement("button", container2, { "className": "canvasrefined-gpa-edit-btn", "textContent": "Edit Calculator" });
-
-            let container = document.querySelector(".canvasrefined-gpa") || document.createElement("div");
-            container.className = "canvasrefined-gpa";
-            container.innerHTML = '<h3 class="canvasrefined-gpa-header">GPA Calculator</h3><div class="canvasrefined-gpa-courses-container"><div class="canvasrefined-gpa-courses"></div></div>';
-
-            if (options.gpa_calc_prepend === true) {
-                document.querySelector(".ic-DashboardCard__box__container").prepend(container2);
-                document.querySelector(".ic-DashboardCard__box__container").prepend(container);
-            } else {
-                document.querySelector(".ic-DashboardCard__box__container").appendChild(container2);
-                document.querySelector(".ic-DashboardCard__box__container").appendChild(container);
+            if (!container2) {
+                container2 = document.createElement("div");
+                container2.className = "canvasrefined-gpa-card";
+            }
+            if (!container) {
+                container = document.createElement("div");
+                container.className = "canvasrefined-gpa";
             }
 
-            let location = document.querySelector(".canvasrefined-gpa-courses");
-            let cumulative = createGPACalcCourse(location, { "id": "cumulative", "enrollments": [{ "has_grading_periods": true, "current_period_computed_current_score": 0 }] });
-            cumulative.id = "canvasrefined-cumulative-gpa";
-            result.forEach(course => createGPACalcCourse(location, course));
+            container2.style.display = options.gpa_calc === true ? "inline-block" : "none";
 
-            container.style.display = "none";
+            if (!alreadyRendered) {
+                container2.innerHTML = `<h3 class="canvasrefined-gpa-header">GPA</h3><div><div><p id="canvasrefined-gpa-unweighted"></p><p>Current</p></div><div style="display:${options["gpa_calc_weighted"] ? "block" : "none"}"><p id="canvasrefined-gpa-weighted"></p><p>Weighted</p></div><div style="display:${options["gpa_calc_cumulative"] ? "block" : "none"}"><p id="canvasrefined-gpa-cumulative"></p><p>Cumulative</p></div></div>`;
+                let editBtn = makeElement("button", container2, { "className": "canvasrefined-gpa-edit-btn", "textContent": "Edit Calculator" });
 
-            editBtn.addEventListener("click", () => {
-                if (container.style.display === "none") {
-                    container.style.display = "inline-block";
-                    editBtn.textContent = "Close Calculator";
+                container.innerHTML = '<h3 class="canvasrefined-gpa-header">GPA Calculator</h3><div class="canvasrefined-gpa-courses-container"><div class="canvasrefined-gpa-courses"></div></div>';
+
+                if (options.gpa_calc_prepend === true) {
+                    dashboardContainer.prepend(container2);
+                    dashboardContainer.prepend(container);
                 } else {
-                    container.style.display = "none";
-                    editBtn.textContent = "Edit Calculator";
+                    dashboardContainer.appendChild(container2);
+                    dashboardContainer.appendChild(container);
                 }
-            });
+
+                let location = document.querySelector(".canvasrefined-gpa-courses");
+                if (!location) return;
+
+                let cumulative = createGPACalcCourse(location, { "id": "cumulative", "enrollments": [{ "has_grading_periods": true, "current_period_computed_current_score": 0 }] });
+                cumulative.id = "canvasrefined-cumulative-gpa";
+                result.forEach(course => createGPACalcCourse(location, course));
+
+                container.style.display = "none";
+
+                editBtn.addEventListener("click", () => {
+                    if (container.style.display === "none") {
+                        container.style.display = "inline-block";
+                        editBtn.textContent = "Close Calculator";
+                    } else {
+                        container.style.display = "none";
+                        editBtn.textContent = "Edit Calculator";
+                    }
+                });
+
+                container2.dataset.canvasrefinedGpaRendered = "true";
+                container.dataset.canvasrefinedGpaRendered = "true";
+            } else {
+                const weighted = container2.querySelector("#canvasrefined-gpa-weighted")?.parentElement;
+                const cumulative = container2.querySelector("#canvasrefined-gpa-cumulative")?.parentElement;
+                if (weighted) weighted.style.display = options.gpa_calc_weighted ? "block" : "none";
+                if (cumulative) cumulative.style.display = options.gpa_calc_cumulative ? "block" : "none";
+
+                const shouldPrepend = options.gpa_calc_prepend === true;
+                const firstCard = shouldPrepend ? container : container2;
+                const secondCard = shouldPrepend ? container2 : container;
+
+                if (firstCard.parentElement !== dashboardContainer) {
+                    dashboardContainer.prepend(firstCard);
+                }
+                if (secondCard.parentElement !== dashboardContainer) {
+                    if (shouldPrepend) {
+                        dashboardContainer.prepend(secondCard);
+                    } else {
+                        dashboardContainer.appendChild(secondCard);
+                    }
+                }
+            }
 
             calculateGPA2();
         });
@@ -3835,7 +3878,7 @@ function applyAestheticChanges() {
     if (options.remlogo === true) style.textContent += ".ic-app-header__logomark-container{display:none}";
     if (options.disable_color_overlay === true) style.textContent += ".ic-DashboardCard__header_hero{opacity: 0!important} .ic-DashboardCard__header-button-bg{opacity: 1!important}";
     if (options.hide_feedback === true) style.textContent += ".recent_feedback {display: none}";
-    if (options.full_width === true) style.textContent += ".ic-Layout-wrapper{max-width:100%!important}";
+    if (options.full_width === true) style.textContent += "#wrapper,.ic-Layout-wrapper{max-width:100%!important}";
 
     if (options.customCardStyles === true) {
         if (options.imageSize !== undefined && options.imageSize !== 100) style.textContent += `.ic-DashboardCard__header_image {transform: scale(${options.imageSize / 100})!important; }`;
